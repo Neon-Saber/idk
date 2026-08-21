@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NeonDesk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #131313;
+    --panel-2: #191919;
+    --border: #262626;
+    --text: #d9d9d6;
+    --text-dim: #6d6d6a;
+    --accent: #ffb000;
+    --accent-dim: rgba(255,176,0,0.15);
+    --ok: #5fd75f;
+    --err: #ff5f56;
+    --radius: 8px;
+    --font-ui: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%; background: var(--bg); color: var(--text);
+    font-family: var(--font-ui); overflow: hidden;
+  }
+
+  /* ===== SCREENS ===== */
+  .screen { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; }
+  .screen.active { display: flex; }
+
+  /* ===== LOGIN SCREEN ===== */
+  #loginScreen {
+    background: var(--bg);
+  }
+  #loginBg {
+    position: absolute; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse at 50% 60%, var(--accent-glow, rgba(255,176,0,0.08)) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  #loginCard {
+    position: relative; z-index: 1;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 16px; padding: 40px 36px 36px;
+    width: 360px; box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    display: flex; flex-direction: column; align-items: center; gap: 24px;
+  }
+  #appLogo { font-size: 32px; margin-bottom: -8px; }
+  #appName { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+  #appSub { font-size: 13px; color: var(--text-dim); margin-top: -16px; }
+
+  .pinLabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); align-self: flex-start; }
+
+  #pinDisplay {
+    display: flex; gap: 12px; justify-content: center;
+  }
+  .pinDot {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--border); background: transparent;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .pinDot.filled { background: var(--accent); border-color: var(--accent); }
+
+  #pinPad {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%;
+  }
+  .pinKey {
+    font-family: var(--font-ui); font-size: 18px; font-weight: 600;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--radius); padding: 16px;
+    cursor: pointer; transition: background 0.1s ease, transform 0.05s ease;
+    text-align: center;
+  }
+  .pinKey:hover { background: #222; }
+  .pinKey:active { transform: scale(0.95); }
+  .pinKey.del { font-size: 14px; color: var(--text-dim); }
+  .pinKey.go { background: var(--accent); color: #1a1200; border-color: var(--accent); }
+  .pinKey.go:hover { filter: brightness(1.1); }
+
+  #loginError { font-size: 12px; color: var(--err); min-height: 16px; text-align: center; }
+  #setupLink { font-size: 12px; color: var(--text-dim); cursor: pointer; text-decoration: underline; }
+  #setupLink:hover { color: var(--text); }
+
+  /* ===== SETUP SCREEN ===== */
+  #setupScreen { background: var(--bg); overflow-y: auto; padding: 40px 20px; }
+  #setupCard {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 36px; width: 100%; max-width: 520px;
+    display: flex; flex-direction: column; gap: 28px;
+  }
+  .setupHeader { display: flex; flex-direction: column; gap: 4px; }
+  .setupHeader h1 { font-size: 20px; font-weight: 700; }
+  .setupHeader p { font-size: 13px; color: var(--text-dim); }
+
+  .setupSection { display: flex; flex-direction: column; gap: 14px; }
+  .setupSection h2 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+  .formRow { display: flex; flex-direction: column; gap: 5px; }
+  .formRow label { font-size: 12px; color: var(--text-dim); }
+  .formRow input, .formRow select {
+    font-family: var(--font-ui); font-size: 14px; color: var(--text);
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 12px; outline: none; width: 100%;
+    transition: border-color 0.15s;
+  }
+  .formRow input:focus, .formRow select:focus { border-color: var(--accent); }
+  .formRow input[type=color] { padding: 4px 8px; height: 40px; cursor: pointer; }
+
+  .colorRow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .themePreview {
+    border-radius: 8px; border: 1px solid var(--border); overflow: hidden; height: 80px;
+    display: flex; flex-direction: column;
+  }
+  .tpBar { height: 28px; display: flex; align-items: center; padding: 0 10px; gap: 6px; font-size: 10px; }
+  .tpDot { width: 7px; height: 7px; border-radius: 50%; }
+  .tpBody { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.4; }
+
+  .btnRow { display: flex; gap: 10px; }
+  .btn {
+    font-family: var(--font-ui); font-size: 13px; font-weight: 600;
+    border: none; border-radius: 6px; padding: 11px 20px; cursor: pointer;
+    transition: filter 0.12s ease;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.primary { background: var(--accent); color: #1a1200; }
+  .btn.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+
+  /* ===== DESKTOP SCREEN ===== */
+  #desktopScreen { flex-direction: column; }
+
+  #topbar {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px; background: var(--panel);
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+    transition: opacity 0.2s ease, transform 0.2s ease; flex-shrink: 0;
+    z-index: 10;
+  }
+  #topbar.hidden { opacity: 0; transform: translateY(-100%); pointer-events: none; }
+
+  #tbLeft { display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap; }
+  #tbRight { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+  .tbBtn {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+    border-radius: 4px; padding: 5px 10px; cursor: pointer;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+    white-space: nowrap;
+  }
+  .tbBtn:hover { color: var(--text); border-color: var(--text-dim); }
+  .tbBtn.active { color: var(--accent); border-color: var(--accent-dim-border, #6b4b00); }
+  .tbBtn.danger:hover { color: var(--err); border-color: var(--err); }
+
+  select.tbSelect {
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+    background: transparent; border: 1px solid var(--border); border-radius: 4px;
+    padding: 5px 22px 5px 8px; outline: none; cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%236d6d6a'/></svg>");
+    background-repeat: no-repeat; background-position: right 7px center;
+  }
+  select.tbSelect:focus { border-color: var(--accent); color: var(--text); }
+
+  #statusPill {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--text-dim);
+  }
+  #dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+  #dot.connected { background: var(--ok); box-shadow: 0 0 6px var(--ok); animation: pulse 1.8s ease-in-out infinite; }
+  #dot.error { background: var(--err); box-shadow: 0 0 6px var(--err); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  #stage {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 14px; overflow: hidden; position: relative;
+    background: radial-gradient(circle at 50% 40%, var(--accent-glow, rgba(255,176,0,0.03)), transparent 60%), var(--bg);
+  }
+  #screen {
+    display: block; background: #000; border: 1px solid var(--border);
+    border-radius: 6px; outline: none; cursor: crosshair;
+    max-width: 100%; max-height: 100%;
+  }
+  #stage:fullscreen { padding: 0; }
+  #stage:fullscreen #screen { border: none; border-radius: 0; }
+  #placeholder {
+    position: absolute; color: var(--text-dim); font-size: 13px;
+    text-align: center; pointer-events: none; display: flex; flex-direction: column; gap: 8px; align-items: center;
+  }
+  #placeholder .glyph { font-size: 28px; color: var(--accent-dim-border, #6b4b00); }
+
+  /* file panel */
+  #filePanel {
+    position: fixed; top: 56px; right: -300px; width: 280px; max-height: 60vh;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    overflow-y: auto; transition: right 0.2s ease; z-index: 20; padding: 12px;
+    font-size: 12px;
+  }
+  #filePanel.open { right: 14px; }
+  #filePanel h3 { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; }
+  #dropZone {
+    border: 1px dashed var(--border); border-radius: 6px; padding: 14px;
+    text-align: center; color: var(--text-dim); font-size: 11px; margin-bottom: 10px; cursor: pointer;
+  }
+  #dropZone.drag { border-color: var(--accent); color: var(--accent); }
+  .fileRow { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); gap: 6px; }
+  .fileRow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .fileRow button { font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; background: transparent; border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; }
+  #transferProgress { font-size: 11px; color: var(--accent); margin-top: 6px; min-height: 14px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="screen active">
+  <div id="loginBg"></div>
+  <div id="loginCard">
+    <div id="appLogo">🖥️</div>
+    <div id="appName">NeonDesk</div>
+    <div id="appSub">remote desktop</div>
+    <div class="pinLabel">enter your PIN</div>
+    <div id="pinDisplay">
+      <div class="pinDot" id="pd0"></div>
+      <div class="pinDot" id="pd1"></div>
+      <div class="pinDot" id="pd2"></div>
+      <div class="pinDot" id="pd3"></div>
+    </div>
+    <div id="pinPad">
+      <button class="pinKey" onclick="pinPress('1')">1</button>
+      <button class="pinKey" onclick="pinPress('2')">2</button>
+      <button class="pinKey" onclick="pinPress('3')">3</button>
+      <button class="pinKey" onclick="pinPress('4')">4</button>
+      <button class="pinKey" onclick="pinPress('5')">5</button>
+      <button class="pinKey" onclick="pinPress('6')">6</button>
+      <button class="pinKey" onclick="pinPress('7')">7</button>
+      <button class="pinKey" onclick="pinPress('8')">8</button>
+      <button class="pinKey" onclick="pinPress('9')">9</button>
+      <button class="pinKey del" onclick="pinDel()">⌫</button>
+      <button class="pinKey" onclick="pinPress('0')">0</button>
+      <button class="pinKey go" onclick="pinGo()">▶</button>
+    </div>
+    <div id="loginError"></div>
+    <span id="setupLink" onclick="showSetup()">⚙ setup / change settings</span>
+  </div>
+</div>
+
+<!-- SETUP SCREEN -->
+<div id="setupScreen" class="screen">
+  <div id="setupCard">
+    <div class="setupHeader">
+      <h1>⚙ Setup</h1>
+      <p>Configure your relay, PIN, and appearance. Saved locally in your browser.</p>
+    </div>
+
+    <div class="setupSection">
+      <h2>Connection</h2>
+      <div class="formRow">
+        <label>Relay URL</label>
+        <input id="cfgUrl" placeholder="wss://129.80.65.136.nip.io">
+      </div>
+      <div class="formRow">
+        <label>Room name</label>
+        <input id="cfgRoom" placeholder="myroom">
+      </div>
+      <div class="formRow">
+        <label>Token (relay secret)</label>
+        <input id="cfgToken" type="password" placeholder="NEONISCOOL">
+      </div>
+    </div>
+
+    <div class="setupSection">
+      <h2>Login PIN</h2>
+      <div class="formRow">
+        <label>4-digit PIN (locks this page locally)</label>
+        <input id="cfgPin" type="password" maxlength="4" placeholder="e.g. 1234">
+      </div>
+    </div>
+
+    <div class="setupSection">
+      <h2>Appearance</h2>
+      <div class="formRow">
+        <label>App name (shown on login screen)</label>
+        <input id="cfgName" placeholder="NeonDesk">
+      </div>
+      <div class="formRow">
+        <label>App icon (emoji)</label>
+        <input id="cfgEmoji" placeholder="🖥️" maxlength="4">
+      </div>
+      <div class="colorRow">
+        <div class="formRow">
+          <label>Accent color</label>
+          <input id="cfgAccent" type="color" value="#ffb000">
+        </div>
+        <div class="formRow">
+          <label>Background color</label>
+          <input id="cfgBg" type="color" value="#0a0a0a">
+        </div>
+      </div>
+      <div class="formRow">
+        <label>Theme preview</label>
+        <div class="themePreview" id="themePreview">
+          <div class="tpBar" id="tpBar">
+            <div class="tpDot" id="tpDot"></div>
+            <span id="tpName" style="font-size:10px">NeonDesk</span>
+          </div>
+          <div class="tpBody" id="tpBody">[ screen here ]</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btnRow">
+      <button class="btn primary" onclick="saveSetup()">Save & continue</button>
+      <button class="btn ghost" onclick="showLogin()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- DESKTOP SCREEN -->
+<div id="desktopScreen" class="screen">
+  <div id="topbar">
+    <div id="tbLeft">
+      <select class="tbSelect" id="monitorSelect"><option>Full Desktop</option></select>
+      <select class="tbSelect" id="qualitySelect">
+        <option value="low">Low FPS</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+      </select>
+      <button class="tbBtn" id="viewOnlyBtn">Control: ON</button>
+      <button class="tbBtn danger" id="lockBtn">🔒 Lock</button>
+      <button class="tbBtn" id="clipSendBtn">Clip →</button>
+      <button class="tbBtn" id="clipGetBtn">← Clip</button>
+      <button class="tbBtn" id="filesBtn">📁 Files</button>
+    </div>
+    <div id="tbRight">
+      <div id="statusPill"><span id="dot"></span><span id="statusText">disconnected</span></div>
+      <button class="tbBtn" id="fullscreenBtn">⛶</button>
+      <button class="tbBtn danger" id="disconnectBtn">✕</button>
+    </div>
+  </div>
+
+  <div id="stage">
+    <div id="placeholder">
+      <span class="glyph">▢</span>
+      <span>connecting…</span>
+    </div>
+    <canvas id="screen" tabindex="0"></canvas>
+  </div>
+</div>
+
+<div id="filePanel">
+  <h3>File Transfer</h3>
+  <div id="dropZone">drop file here or click to choose</div>
+  <input type="file" id="fileInput" style="display:none">
+  <div id="transferProgress"></div>
+  <div id="fileList"></div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const CFG_KEY = 'neondesk_config';
+const DEFAULTS = {
+  url: 'wss://129.80.65.136.nip.io',
+  room: 'myroom',
+  token: 'NEONISCOOL',
+  pin: '1234',
+  name: 'NeonDesk',
+  emoji: '🖥️',
+  accent: '#ffb000',
+  bg: '#0a0a0a',
+};
+
+function loadConfig() {
+  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(CFG_KEY) || '{}') }; }
+  catch (e) { return { ...DEFAULTS }; }
+}
+function saveConfig(cfg) { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }
+
+let cfg = loadConfig();
+
+function applyTheme(c) {
+  document.documentElement.style.setProperty('--accent', c.accent);
+  document.documentElement.style.setProperty('--accent-dim', hexToRgba(c.accent, 0.15));
+  document.documentElement.style.setProperty('--accent-glow', hexToRgba(c.accent, 0.08));
+  document.documentElement.style.setProperty('--accent-dim-border', hexToRgba(c.accent, 0.4));
+  document.documentElement.style.setProperty('--bg', c.bg);
+  document.getElementById('appName').textContent = c.name;
+  document.getElementById('appLogo').textContent = c.emoji;
+  document.title = c.name;
+}
+
+function hexToRgba(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+applyTheme(cfg);
+
+// ===== SCREENS =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function showLogin() { showScreen('loginScreen'); }
+function showSetup() {
+  const c = loadConfig();
+  document.getElementById('cfgUrl').value = c.url;
+  document.getElementById('cfgRoom').value = c.room;
+  document.getElementById('cfgToken').value = c.token;
+  document.getElementById('cfgPin').value = c.pin;
+  document.getElementById('cfgName').value = c.name;
+  document.getElementById('cfgEmoji').value = c.emoji;
+  document.getElementById('cfgAccent').value = c.accent;
+  document.getElementById('cfgBg').value = c.bg;
+  updatePreview();
+  showScreen('setupScreen');
+}
+function saveSetup() {
+  const c = {
+    url: document.getElementById('cfgUrl').value.trim() || DEFAULTS.url,
+    room: document.getElementById('cfgRoom').value.trim() || DEFAULTS.room,
+    token: document.getElementById('cfgToken').value.trim() || DEFAULTS.token,
+    pin: document.getElementById('cfgPin').value.trim() || DEFAULTS.pin,
+    name: document.getElementById('cfgName').value.trim() || DEFAULTS.name,
+    emoji: document.getElementById('cfgEmoji').value.trim() || DEFAULTS.emoji,
+    accent: document.getElementById('cfgAccent').value,
+    bg: document.getElementById('cfgBg').value,
+  };
+  saveConfig(c);
+  cfg = c;
+  applyTheme(cfg);
+  showLogin();
+}
+
+// live preview in setup
+['cfgAccent','cfgBg','cfgName','cfgEmoji'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updatePreview);
+});
+function updatePreview() {
+  const accent = document.getElementById('cfgAccent').value;
+  const bg = document.getElementById('cfgBg').value;
+  const name = document.getElementById('cfgName').value || 'NeonDesk';
+  const emoji = document.getElementById('cfgEmoji').value || '🖥️';
+  document.getElementById('tpBar').style.background = bg === '#0a0a0a' ? '#131313' : bg;
+  document.getElementById('tpDot').style.background = accent;
+  document.getElementById('tpName').textContent = emoji + ' ' + name;
+  document.getElementById('tpBody').style.background = bg;
+  document.getElementById('themePreview').style.borderColor = accent + '40';
+}
+
+// ===== PIN =====
+let pinBuffer = '';
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('pd'+i).classList.toggle('filled', i < pinBuffer.length);
+  }
+}
+function pinPress(d) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d;
+  updatePinDots();
+  if (pinBuffer.length === 4) setTimeout(pinGo, 120);
+}
+function pinDel() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updatePinDots();
+  document.getElementById('loginError').textContent = '';
+}
+function pinGo() {
+  const c = loadConfig();
+  if (pinBuffer === c.pin) {
+    cfg = c;
+    applyTheme(cfg);
+    pinBuffer = '';
+    updatePinDots();
+    showScreen('desktopScreen');
+    startConnection();
+  } else {
+    document.getElementById('loginError').textContent = 'wrong PIN';
+    pinBuffer = '';
+    updatePinDots();
+    setTimeout(() => document.getElementById('loginError').textContent = '', 1500);
+  }
+}
+
+// keyboard PIN entry
+document.addEventListener('keydown', (e) => {
+  const active = document.querySelector('.screen.active');
+  if (!active || active.id !== 'loginScreen') return;
+  if (e.key >= '0' && e.key <= '9') pinPress(e.key);
+  if (e.key === 'Backspace') pinDel();
+  if (e.key === 'Enter') pinGo();
+});
+
+// ===== CONNECTION =====
+let ws = null;
+let manualDisconnect = false;
+let reconnectDelay = 1000;
+let reconnectTimer = null;
+let viewOnly = false;
+let pendingDownloads = {};
+
+const canvas = document.getElementById('screen');
+const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+const img = new Image();
+canvas.style.display = 'none';
+
+img.onload = () => {
+  if (canvas.width !== img.width || canvas.height !== img.height) {
+    canvas.width = img.width; canvas.height = img.height;
+  }
+  ctx.drawImage(img, 0, 0);
+  if (canvas.style.display === 'none') {
+    canvas.style.display = 'block';
+    document.getElementById('placeholder').style.display = 'none';
+  }
+};
+
+function setStatus(text, cls) {
+  document.getElementById('statusText').textContent = text;
+  document.getElementById('dot').className = cls || '';
+}
+
+function startConnection() {
+  manualDisconnect = false;
+  reconnectDelay = 1000;
+  doConnect();
+}
+
+function doConnect() {
+  const c = loadConfig();
+  const url = `${c.url.replace(/\/$/, '')}/?role=viewer&room=${encodeURIComponent(c.room)}&token=${encodeURIComponent(c.token)}`;
+  connect(url);
+}
+
+function connect(url) {
+  if (ws) ws.close();
+  clearTimeout(reconnectTimer);
+  setStatus('connecting');
+  ws = new WebSocket(url);
+  ws.onopen = () => { setStatus('connected', 'connected'); canvas.focus(); reconnectDelay = 1000; };
+  ws.onclose = () => {
+    setStatus('disconnected');
+    canvas.style.display = 'none';
+    document.getElementById('placeholder').style.display = 'flex';
+    document.getElementById('placeholder').querySelector('span:last-child').textContent = 'disconnected';
+    if (!manualDisconnect) {
+      const secs = Math.round(reconnectDelay/1000);
+      setStatus(`retry in ${secs}s`);
+      reconnectTimer = setTimeout(() => {
+        doConnect();
+        reconnectDelay = Math.min(reconnectDelay * 1.6, 15000);
+      }, reconnectDelay);
+    }
+  };
+  ws.onerror = () => setStatus('error', 'error');
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'frame') {
+      img.src = 'data:image/jpeg;base64,' + msg.data;
+    } else if (msg.type === 'monitors') {
+      populateMonitors(msg.list, msg.current);
+    } else if (msg.type === 'clipboard') {
+      navigator.clipboard.writeText(msg.text || '').catch(() => {});
+      showToast('clipboard copied from PC');
+    } else if (msg.type === 'file_list') {
+      renderFileList(msg.files);
+    } else if (msg.type === 'file_start_down') {
+      pendingDownloads[msg.id] = { name: msg.name, chunks: {} };
+    } else if (msg.type === 'file_chunk_down') {
+      const d = pendingDownloads[msg.id];
+      if (d) d.chunks[msg.seq] = msg.data;
+    } else if (msg.type === 'file_end_down') {
+      const d = pendingDownloads[msg.id];
+      if (d) {
+        const ordered = Object.keys(d.chunks).sort((a,b)=>+a-+b).map(k=>d.chunks[k]).join('');
+        const a = document.createElement('a');
+        a.href = 'data:application/octet-stream;base64,' + ordered;
+        a.download = d.name; a.click();
+        delete pendingDownloads[msg.id];
+      }
+    }
+  };
+}
+
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+function showToast(msg) {
+  document.getElementById('transferProgress').textContent = msg;
+  setTimeout(() => document.getElementById('transferProgress').textContent = '', 2500);
+}
+
+// ===== CONTROLS =====
+document.getElementById('monitorSelect').addEventListener('change', (e) => {
+  const val = parseInt(e.target.value, 10);
+  if (!isNaN(val)) send({ type: 'select_monitor', index: val });
+});
+document.getElementById('qualitySelect').addEventListener('change', (e) => {
+  send({ type: 'set_quality', preset: e.target.value });
+});
+
+const viewOnlyBtn = document.getElementById('viewOnlyBtn');
+viewOnlyBtn.onclick = () => {
+  viewOnly = !viewOnly;
+  send({ type: 'view_only', enabled: viewOnly });
+  viewOnlyBtn.textContent = viewOnly ? 'Control: OFF' : 'Control: ON';
+  viewOnlyBtn.classList.toggle('active', viewOnly);
+  canvas.style.cursor = viewOnly ? 'default' : 'crosshair';
+};
+
+document.getElementById('lockBtn').onclick = () => {
+  if (confirm('Lock the remote PC?')) send({ type: 'lock' });
+};
+document.getElementById('clipSendBtn').onclick = async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    send({ type: 'clipboard_set', text });
+    showToast('clipboard sent to PC');
+  } catch (e) { alert('Browser denied clipboard access.'); }
+};
+document.getElementById('clipGetBtn').onclick = () => send({ type: 'clipboard_get' });
+document.getElementById('fullscreenBtn').onclick = () => {
+  if (!document.fullscreenElement) stage.requestFullscreen().catch(() => {});
+  else document.exitFullscreen();
+};
+document.getElementById('disconnectBtn').onclick = () => {
+  manualDisconnect = true;
+  if (ws) ws.close();
+  showLogin();
+};
+document.getElementById('filesBtn').onclick = () => {
+  document.getElementById('filePanel').classList.toggle('open');
+  if (document.getElementById('filePanel').classList.contains('open')) send({ type: 'file_list_request' });
+};
+
+// monitors
+function populateMonitors(list, current) {
+  const sel = document.getElementById('monitorSelect');
+  const selectable = list.filter(m => m.index !== 0);
+  sel.innerHTML = '';
+  if (!selectable.length) { sel.innerHTML = '<option>Full Desktop</option>'; return; }
+  selectable.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.index; opt.textContent = m.label;
+    if (m.index === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// auto-hide toolbar in fullscreen
+let hideTimer = null;
+document.addEventListener('fullscreenchange', () => {
+  const bar = document.getElementById('topbar');
+  if (document.fullscreenElement) {
+    stage.addEventListener('mousemove', showBarTemp);
+  } else {
+    bar.classList.remove('hidden');
+    stage.removeEventListener('mousemove', showBarTemp);
+    clearTimeout(hideTimer);
+  }
+});
+function showBarTemp(e) {
+  const bar = document.getElementById('topbar');
+  if (e.clientY < 60) {
+    bar.classList.remove('hidden');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => bar.classList.add('hidden'), 2000);
+  }
+}
+
+// ===== INPUT =====
+function scaledCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: Math.round((e.clientX - rect.left) * (canvas.width / rect.width)),
+    y: Math.round((e.clientY - rect.top) * (canvas.height / rect.height)),
+  };
+}
+canvas.addEventListener('mousemove', e => { if (!viewOnly) send({ type: 'mousemove', ...scaledCoords(e) }); });
+canvas.addEventListener('mousedown', e => { if (!viewOnly) { send({ type: 'mousedown', ...scaledCoords(e), button: e.button }); canvas.focus(); } });
+canvas.addEventListener('mouseup', e => { if (!viewOnly) send({ type: 'mouseup', button: e.button }); });
+canvas.addEventListener('wheel', e => { if (!viewOnly) send({ type: 'scroll', dy: e.deltaY }); e.preventDefault(); }, { passive: false });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('keydown', e => { if (!viewOnly) send({ type: 'keydown', key: e.key }); e.preventDefault(); });
+canvas.addEventListener('keyup', e => { if (!viewOnly) send({ type: 'keyup', key: e.key }); e.preventDefault(); });
+
+// ===== FILE TRANSFER =====
+function renderFileList(files) {
+  const fl = document.getElementById('fileList');
+  fl.innerHTML = '';
+  if (!files.length) { fl.innerHTML = '<div style="color:var(--text-dim);font-size:11px">no files yet</div>'; return; }
+  files.forEach(f => {
+    const row = document.createElement('div'); row.className = 'fileRow';
+    const sizeKb = (f.size / 1024).toFixed(1);
+    row.innerHTML = `<span title="${f.name}">${f.name} (${sizeKb}KB)</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = '↓';
+    btn.onclick = () => send({ type: 'file_download_request', name: f.name, id: 'dl_' + Date.now() });
+    row.appendChild(btn); fl.appendChild(row);
+  });
+}
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+dropZone.onclick = () => fileInput.click();
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag'); if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) uploadFile(fileInput.files[0]); });
+
+function uploadFile(file) {
+  const id = 'up_' + Date.now(), chunkSize = 150_000;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const bytes = new Uint8Array(reader.result);
+    const total = Math.ceil(bytes.length / chunkSize);
+    send({ type: 'file_start', id, name: file.name, size: bytes.length });
+    let seq = 0;
+    function next() {
+      if (seq >= total) { send({ type: 'file_end', id }); showToast('upload complete'); return; }
+      const chunk = bytes.slice(seq * chunkSize, (seq + 1) * chunkSize);
+      let bin = ''; chunk.forEach(b => bin += String.fromCharCode(b));
+      send({ type: 'file_chunk', id, seq, data: btoa(bin) });
+      document.getElementById('transferProgress').textContent = `uploading ${Math.round(seq/total*100)}%`;
+      seq++;
+      setTimeout(next, 15);
+    }
+    next();
+  };
+  reader.readAsArrayBuffer(file);
+}
+</script>
+</body>
+</html>
