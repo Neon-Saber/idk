@@ -512,12 +512,14 @@ const stage = document.getElementById('stage');
 const img = new Image();
 canvas.style.display = 'none';
 
+let hasFrame = false;
 img.onload = () => {
   if (canvas.width !== img.width || canvas.height !== img.height) {
     canvas.width = img.width; canvas.height = img.height;
   }
   ctx.drawImage(img, 0, 0);
-  if (canvas.style.display === 'none') {
+  if (!hasFrame) {
+    hasFrame = true;
     canvas.style.display = 'block';
     document.getElementById('placeholder').style.display = 'none';
   }
@@ -548,6 +550,7 @@ function connect(url) {
   ws.onopen = () => { setStatus('connected', 'connected'); canvas.focus(); reconnectDelay = 1000; };
   ws.onclose = () => {
     setStatus('disconnected');
+    hasFrame = false;
     canvas.style.display = 'none';
     document.getElementById('placeholder').style.display = 'flex';
     document.getElementById('placeholder').querySelector('span:last-child').textContent = 'disconnected';
